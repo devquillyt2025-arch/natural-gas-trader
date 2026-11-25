@@ -1,0 +1,23 @@
+[project]
+name = "natgas-trader"
+version = "1.0.0"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["engine/tests"]
+addopts = "-q"
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["engine"]
+strict = true
+warn_unreachable = false
+
+[tool.ruff]
+line-length = 132
+target-version = "py311"
+extend-exclude = ["reference", "web"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E741"]  # `l` is a candle low

@@ -1,0 +1,294 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  background: #06080d;
+}
+
+body {
+  color: #eaeef7;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ambient light behind everything: three soft glows and a faint grid. Purely decorative. */
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ambient::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, #000 20%, transparent 75%);
+}
+.ambient i {
+  position: absolute;
+  display: block;
+  width: 62vmax;
+  height: 62vmax;
+  border-radius: 50%;
+  opacity: 0.55;
+  will-change: transform;
+}
+.ambient i:nth-child(1) {
+  top: -34vmax;
+  left: -18vmax;
+  background: radial-gradient(circle, rgba(91, 140, 255, 0.34), transparent 62%);
+  animation: drift 26s ease-in-out infinite alternate;
+}
+.ambient i:nth-child(2) {
+  top: -30vmax;
+  right: -22vmax;
+  background: radial-gradient(circle, rgba(155, 123, 255, 0.28), transparent 62%);
+  animation: drift 34s ease-in-out infinite alternate-reverse;
+}
+.ambient i:nth-child(3) {
+  bottom: -42vmax;
+  left: 24vw;
+  background: radial-gradient(circle, rgba(0, 184, 148, 0.18), transparent 60%);
+  animation: drift 40s ease-in-out infinite alternate;
+}
+
+:focus-visible {
+  outline: 2px solid #8fb0ff;
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgba(91, 140, 255, 0.35);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+@layer components {
+  .num {
+    @apply font-mono tabular-nums;
+  }
+  .label {
+    @apply text-xxs font-semibold uppercase tracking-[0.12em] text-dim;
+  }
+
+  /* the surface everything sits on */
+  .glass {
+    @apply rounded-2xl border border-line shadow-card;
+    /* near-opaque instead of backdrop blur: blurring many panels over a moving background costs the GPU all day */
+    background: linear-gradient(180deg, rgba(22, 28, 41, 0.93), rgba(11, 15, 23, 0.95));
+  }
+  .tile {
+    @apply rounded-xl border border-line bg-white/[0.025] px-3 py-2.5;
+  }
+
+  .btn {
+    @apply inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-white/[0.04] px-3.5 py-2 text-sm font-medium text-ink;
+    transition:
+      transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
+      background-color 200ms,
+      border-color 200ms,
+      box-shadow 200ms;
+  }
+  .btn:hover:not(:disabled) {
+    @apply border-line-strong bg-white/[0.08];
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .btn:disabled {
+    @apply cursor-not-allowed opacity-45;
+  }
+  .btn-primary,
+  .btn-primary:hover:not(:disabled) {
+    @apply border-transparent text-white;
+    background: linear-gradient(135deg, #3b6cf5, #7a56e8);
+  }
+  .btn-primary:hover:not(:disabled) {
+    @apply shadow-glow;
+  }
+  .btn-danger,
+  .btn-danger:hover:not(:disabled) {
+    @apply border-transparent font-semibold text-white;
+    background: linear-gradient(135deg, #d42843, #b91c4b);
+  }
+  .btn-danger:hover:not(:disabled) {
+    @apply shadow-glow-down;
+  }
+
+  .field {
+    @apply min-h-10 rounded-xl border border-line bg-black/30 px-3 py-1.5 text-sm text-ink placeholder:italic placeholder:text-faint;
+    transition: border-color 200ms, box-shadow 200ms;
+  }
+  .field:focus {
+    @apply border-accent;
+    box-shadow: 0 0 0 3px rgba(91, 140, 255, 0.22);
+  }
+
+  .th {
+    @apply whitespace-nowrap border-b border-line px-4 py-2.5 text-left text-xxs font-semibold uppercase tracking-[0.1em] text-faint;
+  }
+  .td {
+    @apply border-b border-line px-4 py-2.5 align-top text-sm;
+  }
+  tbody tr:last-child > .td {
+    @apply border-b-0;
+  }
+  .row-hover {
+    transition: background-color 180ms;
+  }
+  .row-hover:hover {
+    background: rgba(255, 255, 255, 0.035);
+  }
+
+  .seg {
+    @apply inline-flex gap-1 rounded-xl border border-line bg-black/30 p-1;
+  }
+  .seg-item {
+    @apply cursor-pointer rounded-lg px-3 py-1 text-xs font-medium text-dim;
+    transition: background-color 200ms, color 200ms;
+  }
+  .seg-item:hover {
+    @apply text-ink;
+  }
+  .seg-on,
+  .seg-on:hover {
+    @apply bg-white/10 text-white;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .gradient-text {
+    background: linear-gradient(100deg, #8fb0ff, #b9a4ff 55%, #5fe0f2);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* ---------------------------------------------------------------- motion: short, meaningful, skippable */
+@keyframes drift {
+  to {
+    transform: translate3d(7vmax, 5vmax, 0) scale(1.08);
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+}
+@keyframes ping-dot {
+  75%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+@keyframes flash-up {
+  from {
+    color: #2ee6b6;
+    text-shadow: 0 0 24px rgba(46, 230, 182, 0.75);
+  }
+}
+@keyframes flash-down {
+  from {
+    color: #ff7586;
+    text-shadow: 0 0 24px rgba(255, 117, 134, 0.75);
+  }
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translate3d(24px, 0, 0);
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translate3d(0, 8px, 0);
+  }
+}
+@keyframes sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rise {
+  animation: rise 420ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.flash-up {
+  animation: flash-up 900ms ease-out;
+}
+.flash-down {
+  animation: flash-down 900ms ease-out;
+}
+.shimmer {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 25%, rgba(255, 255, 255, 0.12) 50%, rgba(255, 255, 255, 0.05) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+.drawer-in {
+  animation: slide-in 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+dialog[open] {
+  animation: pop 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+dialog::backdrop {
+  background: rgba(2, 4, 8, 0.72);
+  backdrop-filter: blur(4px);
+}
+.live-dot {
+  position: relative;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+.live-dot.pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: currentColor;
+  animation: ping-dot 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.radar {
+  background: conic-gradient(from 0deg, transparent 0 65%, rgba(91, 140, 255, 0.85));
+  animation: sweep 2.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

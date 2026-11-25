@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NatGas Trader</title>
+<style>
+  :root { --bg:#0b0d10; --panel:#12161b; --line:#222a33; --txt:#d7dde5; --dim:#7d8896;
+          --up:#089981; --down:#f23645; --warn:#e0a526; --accent:#4c8dff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:14px/1.45 ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif; }
+  header { display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  h1 { font-size:16px; margin:0; font-weight:600; letter-spacing:.2px; }
+  .chip { padding:2px 9px; border-radius:99px; font-size:12px; border:1px solid var(--line); color:var(--dim); }
+  .chip.live { color:#fff; background:var(--down); border-color:var(--down); }
+  .chip.paper { color:var(--accent); border-color:var(--accent); }
+  .chip.ok { color:var(--up); border-color:var(--up); } .chip.bad { color:var(--down); border-color:var(--down); }
+  .chip.warn { color:var(--warn); border-color:var(--warn); }
+  .spacer { flex:1; }
+  button, a.btn { background:var(--panel); color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:6px 12px; cursor:pointer; font:inherit; text-decoration:none; }
+  button.kill { border-color:var(--down); color:var(--down); } button.go { border-color:var(--up); color:var(--up); }
+  main { padding:20px; display:grid; gap:16px; max-width:1200px; margin:0 auto; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .card .l { color:var(--dim); font-size:12px; text-transform:uppercase; letter-spacing:.6px; }
+  .card .v { font-size:22px; font-weight:600; margin-top:4px; font-variant-numeric:tabular-nums; }
+  .card .s { color:var(--dim); font-size:12px; margin-top:2px; }
+  .up { color:var(--up); } .down { color:var(--down); }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  section h2 { margin:0; padding:12px 16px; font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--dim); border-bottom:1px solid var(--line); }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:9px 16px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--dim); font-weight:500; font-size:12px; }
+  td.num { font-variant-numeric:tabular-nums; white-space:nowrap; }
+  td.why { color:var(--dim); max-width:560px; }
+  tr:last-child td { border-bottom:0; }
+  .empty { padding:18px 16px; color:var(--dim); }
+  #banner { display:none; padding:10px 16px; border-radius:10px; border:1px solid var(--warn); color:var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <h1>NatGas Trader</h1>
+  <span id="mode" class="chip">--</span>
+  <span id="market" class="chip">--</span>
+  <span id="auth" class="chip">--</span>
+  <span id="kill" class="chip">--</span>
+  <span class="spacer"></span>
+  <a id="login" class="btn" href="/auth/login" style="display:none">Log in to Upstox</a>
+  <button id="killbtn" class="kill">Kill switch</button>
+  <button id="resumebtn" class="go" style="display:none">Resume</button>
+</header>
+<main>
+  <div id="banner"></div>
+  <div class="cards">
+    <div class="card"><div class="l">Last price</div><div class="v" id="ltp">--</div><div class="s" id="ltpat"></div></div>
+    <div class="card"><div class="l">P&amp;L today</div><div class="v" id="pnl">--</div><div class="s" id="limits"></div></div>
+    <div class="card"><div class="l">Position</div><div class="v" id="pos">Flat</div><div class="s" id="posd"></div></div>
+    <div class="card"><div class="l">Next EIA report</div><div class="v" id="eia">--</div><div class="s" id="entries"></div></div>
+  </div>
+  <section><h2>Decisions (Claude)</h2><div id="decisions"></div></section>
+  <section><h2>Trades</h2><div id="trades"></div></section>
+  <section><h2>Events</h2><div id="events"></div></section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (n, d=2) => n == null ? '--' : Number(n).toLocaleString('en-IN', {minimumFractionDigits:d, maximumFractionDigits:d});
+const hhmm = iso => iso ? iso.slice(5,16).replace('T',' ') : '';
+let adminRequired = false;
+
+function chip(el, text, cls) { el.textContent = text; el.className = 'chip ' + (cls || ''); }
+function td(text, cls) { const c = document.createElement('td'); c.textContent = text ?? ''; if (cls) c.className = cls; return c; }
+function table(el, heads, rows) {
+  el.replaceChildren();
+  if (!rows.length) { const d = document.createElement('div'); d.className = 'empty'; d.textContent = 'Nothing yet.'; el.append(d); return; }
+  const t = document.createElement('table'), h = t.createTHead().insertRow();
+  heads.forEach(x => { const th = document.createElement('th'); th.textContent = x; h.append(th); });
+  const b = t.createTBody();
+  rows.forEach(r => { const tr = b.insertRow(); r.forEach(c => tr.append(c)); });
+  el.append(t);
+}
+async function post(url) {
+  const headers = {};
+  if (adminRequired) {
+    let t = sessionStorage.getItem('admin') || prompt('Admin token');
+    if (!t) return; sessionStorage.setItem('admin', t); headers['x-admin-token'] = t;
+  }
+  const r = await fetch(url, {method:'POST', headers});
+  if (r.status === 401) sessionStorage.removeItem('admin');
+  refresh();
+}
+$('killbtn').onclick = () => confirm('Block new entries and flatten any open position?') && post('/api/kill');
+$('resumebtn').onclick = () => post('/api/resume');
+
+async function refresh() {
+  try {
+    const [s, d, t, e] = await Promise.all(['status','decisions','trades','events'].map(x => fetch('/api/'+x).then(r => r.json())));
+    adminRequired = s.admin_required;
+    chip($('mode'), s.mode.toUpperCase() + ' · ' + s.symbol, s.mode === 'live' ? 'live' : 'paper');
+    chip($('market'), s.market_open ? 'market open' : 'market closed', s.market_open ? 'ok' : '');
+    chip($('auth'), s.upstox_authed ? 'Upstox connected' : 'Upstox login needed', s.upstox_authed ? 'ok' : 'bad');
+    $('login').style.display = s.upstox_authed ? 'none' : '';
+    chip($('kill'), s.kill ? 'KILL ON' : 'running', s.kill ? 'bad' : 'ok');
+    $('killbtn').style.display = s.kill ? 'none' : ''; $('resumebtn').style.display = s.kill ? '' : 'none';
+
+    $('ltp').textContent = fmt(s.ltp); $('ltpat').textContent = s.ltp_at ? 'as of ' + s.ltp_at.slice(11,19) + ' IST' : '';
+    const pnl = $('pnl'); pnl.textContent = s.pnl_today == null ? '--' : (s.pnl_today >= 0 ? '+' : '') + fmt(s.pnl_today, 0) + ' ₹';
+    pnl.className = 'v ' + (s.pnl_today > 0 ? 'up' : s.pnl_today < 0 ? 'down' : '');
+    $('limits').textContent = 'cap −' + fmt(s.limits.daily_loss_cap_inr, 0) + ' · risk/trade ' + fmt(s.limits.max_risk_inr, 0);
+    if (s.position) {
+      const p = s.position; $('pos').textContent = p.side + ' ' + p.lots + 'L @ ' + fmt(p.entry);
+      $('posd').textContent = 'SL ' + fmt(p.stop_loss) + ' · TP ' + fmt(p.target) + ' · unreal ' + fmt(s.unrealized, 0) + ' ₹';
+    } else { $('pos').textContent = 'Flat'; $('posd').textContent = ''; }
+    $('eia').textContent = hhmm(s.next_eia).slice(6) + ' IST'; $('entries').textContent = s.entries_allowed ? 'entries allowed' : 'entries blocked now';
+
+    const b = $('banner'), msgs = [];
+    if (s.orphan) msgs.push('Position at broker the app does not know about. Entries blocked.');
+    if (s.last_error) msgs.push('Engine error: ' + s.last_error);
+    b.style.display = msgs.length ? 'block' : 'none'; b.textContent = msgs.join('  ');
+
+    table($('decisions'), ['Time','Action','Price','Conf','Risk layer','Reasoning'], d.map(x => [
+      td(hhmm(x.ts), 'num'), td(x.action), td(fmt(x.price), 'num'), td(x.confidence == null ? '' : fmt(x.confidence, 2), 'num'),
+      td((x.approved ? '✓ ' : '✗ ') + x.verdict, x.approved ? 'up' : 'down'), td(x.reasoning, 'why')]));
+    table($('trades'), ['Closed','Side','Lots','Entry','Exit','P&L ₹','Reason'], t.map(x => [
+      td(hhmm(x.closed_at), 'num'), td(x.side), td(x.lots), td(fmt(x.entry), 'num'), td(fmt(x.exit), 'num'),
+      td((x.pnl >= 0 ? '+' : '') + fmt(x.pnl, 0), 'num ' + (x.pnl >= 0 ? 'up' : 'down')), td(x.exit_reason, 'why')]));
+    table($('events'), ['Time','Level','Message'], e.map(x => [td(hhmm(x.ts), 'num'), td(x.level), td(x.msg, 'why')]));
+  } catch (err) { chip($('market'), 'API unreachable', 'bad'); }
+}
+refresh(); setInterval(refresh, 5000);
+</script>
+</body>
+</html>

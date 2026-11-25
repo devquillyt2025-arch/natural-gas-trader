@@ -1,0 +1,27 @@
+# secrets
+.env
+.env.local
+*.env
+!.env.example
+
+# engine
+.venv/
+engine/data/
+data/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# web and SQL tests
+node_modules/
+.next/
+out/
+test-results/
+playwright-report/
+*.tsbuildinfo
+.vercel/
+
+# local backup
+backup-*.zip

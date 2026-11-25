@@ -1,0 +1,11 @@
+{
+  "name": "natgas-trader",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "demo": "node scripts/dev.mjs --demo",
+    "db:setup": "node scripts/setup-db.mjs",
+    "claude:check": "node scripts/claude-check.mjs"
+  }
+}
